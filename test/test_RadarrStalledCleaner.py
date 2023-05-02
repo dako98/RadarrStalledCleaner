@@ -1,3 +1,9 @@
+'''
+Tests for the RadarrStalledCleaner script.
+The tests mock the RadarrAPI from pyarr.
+A hosted server and api key is not needed.
+'''
+
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -9,27 +15,27 @@ import src.RadarrStalledCleaner as RadarrStalledCleaner
 
 class TestMain(unittest.TestCase):
 
-    @patch("src.RadarrStalledCleaner.RadarrAPI")
+    @patch('src.RadarrStalledCleaner.RadarrAPI')
     def test_remaining_time_exceeded(self, mock_radarr_api):
-        """Tests the main function when the remaining time is exceeded.
+        '''Tests the main function when the remaining time is exceeded.
 
         Args:
             mock_radarr_api (MagicMock): A mock of the RadarrAPI class.
-        """
+        '''
 
         # Mock data
         late_completion_time = (dt.now() + tdelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
         grab_time = (dt.now() - tdelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
         queued_movies = [
             {
-                "movieId": 1,
-                "id": 1,
-                "title": "Movie Title",
-                "status": "downloading",
-                "estimatedCompletionTime": late_completion_time,
+                'movieId': 1,
+                'id': 1,
+                'title': 'Movie Title',
+                'status': 'downloading',
+                'estimatedCompletionTime': late_completion_time,
             }
         ]
-        grab_events = [{"date": grab_time, "id": 1}]
+        grab_events = [{'date': grab_time, 'id': 1}]
 
         # Create a mock instance of RadarrAPI
         mock_radarr_api_instance = MagicMock()
@@ -46,26 +52,26 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(mock_radarr_api.return_value.del_queue.call_count, 1)
     
-    @patch("src.RadarrStalledCleaner.RadarrAPI")
+    @patch('src.RadarrStalledCleaner.RadarrAPI')
     def test_remaining_time_not_exceeded(self, mock_radarr_api):
-        """Tests the main function when the remaining time is not exceeded.
+        '''Tests the main function when the remaining time is not exceeded.
 
         Args:
             mock_radarr_api (MagicMock): A mock of the RadarrAPI class.
-        """
+        '''
         # Mock data
         normal_completion_time = (dt.now() + tdelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%SZ')
         grab_time = (dt.now() - tdelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
         queued_movies = [
             {
-                "movieId": 1,
-                "id": 1,
-                "title": "Movie Title",
-                "status": "downloading",
-                "estimatedCompletionTime": normal_completion_time,
+                'movieId': 1,
+                'id': 1,
+                'title': 'Movie Title',
+                'status': 'downloading',
+                'estimatedCompletionTime': normal_completion_time,
             }
         ]
-        grab_events = [{"date": grab_time, "id": 1}]
+        grab_events = [{'date': grab_time, 'id': 1}]
 
         # Create a mock instance of RadarrAPI
         mock_radarr_api_instance = MagicMock()
@@ -82,26 +88,26 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(mock_radarr_api.return_value.del_queue.call_count, 0)
 
-    @patch("src.RadarrStalledCleaner.RadarrAPI")
+    @patch('src.RadarrStalledCleaner.RadarrAPI')
     def test_hard_time_limit_exceeded(self, mock_radarr_api):
-        """Tests the main function when the hard time limit is exceeded.
+        '''Tests the main function when the hard time limit is exceeded.
 
         Args:
             mock_radarr_api (MagicMock): A mock of the RadarrAPI class.
-        """
+        '''
         # Mock data
         normal_completion_time = (dt.now() + tdelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%SZ')
         grab_time = (dt.now() - tdelta(days=2, hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ') # Overdue by more than 2 days
         queued_movies = [
             {
-                "movieId": 1,
-                "id": 1,
-                "title": "Movie Title",
-                "status": "downloading",
-                "estimatedCompletionTime": normal_completion_time, 
+                'movieId': 1,
+                'id': 1,
+                'title': 'Movie Title',
+                'status': 'downloading',
+                'estimatedCompletionTime': normal_completion_time, 
             }
         ]
-        grab_events = [{"date": grab_time, "id": 1}]
+        grab_events = [{'date': grab_time, 'id': 1}]
 
         # Create a mock instance of RadarrAPI
         mock_radarr_api_instance = MagicMock()
@@ -120,5 +126,5 @@ class TestMain(unittest.TestCase):
         self.assertEqual(mock_radarr_api.return_value.del_queue.call_count, 1)
 
 
-if __name__ == "main":
+if __name__ == 'main':
     unittest.main()
