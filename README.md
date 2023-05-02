@@ -1,6 +1,6 @@
 # Radarr Stalled Cleaner
 
-Stalled Cleaner is a Python script that helps manage movie downloads in a Radarr queue. It checks the estimated remaining time and the time elapsed since a movie was grabbed. If the remaining time or the elapsed time exceed specified limits, the script will remove the movie from the queue.
+Radarr Stalled Cleaner is a Python script that helps manage movie downloads in a Radarr queue. It checks the estimated remaining time and the time elapsed since a movie was grabbed. If the remaining time or the elapsed time exceed specified limits, the script will remove the movie from the queue.
 
 ## Features
 
@@ -10,14 +10,14 @@ Stalled Cleaner is a Python script that helps manage movie downloads in a Radarr
 
 ## Installation
 
-1. Make sure you have Python 3.9 or higher installed.
-2. Install the required dependencies using the `requirements.txt` file:
+1. Make sure you have Python 3.9.13 or higher installed.
+2. Install the package using pip, it should automatically install the required dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
 
-Certainly! Here is a README.md that explains the Makefile:
+3. Install the package.
 
 ## Developement
 
@@ -49,7 +49,7 @@ make launch
 
 ### `test`
 
-This target runs the tests for the `citybuilder` package.
+This target runs the tests for the package.
 
 ```sh
 make test
@@ -60,7 +60,7 @@ make test
 Open the script file and update the following variables with your Radarr host URL and API key:
 
 ```python
-host_url = 'localhost:8989'
+host_url = 'address:port'
 api_key = 'your_radarr_api_key_here'
 ```
 
