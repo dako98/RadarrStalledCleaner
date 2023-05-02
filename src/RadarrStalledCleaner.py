@@ -6,7 +6,7 @@
  Date: 21.04.2023 (v1.0)    - Initial release.
  Date: 02.05.2023 (v1.1)    - Added logging and fixed items with no download events.
  Date: 02.05.2023 (v1.2)    - Added check for estimated time ramaining.
- 
+
  Version: 1.1
 '''
 
@@ -122,7 +122,7 @@ def main(args):
                         datefmt =   '%Y-%m-%d %H:%M:%S',
                         format =    u'%(asctime)s %(levelname)-8s %(message)s'
                         )
-        
+
     radarr = get_radarr(host_url, api_key)
     queued_movies = get_queued_movies(radarr)
 
@@ -145,12 +145,12 @@ def main(args):
         # Sort by grab date.
         grab_events.sort(key=lambda event: event['date'],reverse=True)
         last_grab_event = grab_events[0]
-        
+
         # Debug print
         for evt in grab_events:
             time_delta = dt.now() - dt.strptime(evt['date'], '%Y-%m-%dT%H:%M:%SZ')
             logging.debug('%s --- %s --- %s', evt['date'], movie_download['title'], time_delta)
-        
+
         # Get time elapsed from last grab.
         time_elapsed = dt.now() - dt.strptime(last_grab_event['date'], '%Y-%m-%dT%H:%M:%SZ')
 
@@ -168,10 +168,10 @@ def main(args):
         # Delete movie download and blacklist release if elapsed time is too long
         if time_elapsed > time_limit:
             logging.info('Removing stale movie download: %s', movie_download['title'] )
-            
+
             logging.debug('Removing stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
                            movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
-            
+
             delete_movie_download(radarr, movie_download)
 
 

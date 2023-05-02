@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from datetime import timedelta as tdelta
 from datetime import datetime as dt
 
-import RadarrStalledCleaner as RadarrStalledCleaner
+import src.RadarrStalledCleaner as RadarrStalledCleaner
 
 
 class TestMain(unittest.TestCase):
