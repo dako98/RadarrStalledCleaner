@@ -31,8 +31,7 @@ endif
 clean:
 	-@$(ECHO_SCRIPT) $(CYAN) "--------Cleaning the venv files--------"
 	-$(RMDIR) $(VENV)
-	-$(RMDIR) build
-	-$(RMDIR) dist
+	-$(RMDIR) .pytest_cache
 	-@$(ECHO_SCRIPT) $(CYAN) "--------Finished cleaning the venv files--------"
 
 .PHONY venv:
