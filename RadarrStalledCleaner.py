@@ -5,8 +5,9 @@
  Author: Dako Dimov
  Date: 21.04.2023 (v1.0)    - Initial release.
  Date: 02.05.2023 (v1.1)    - Added logging and fixed items with no download events.
+ Date: 26.05.2023 (v1.2)    - Fixed logging errors that are not errors and added log file rotation.
  
- Version: 1.1
+ Version: 1.2
 '''
 
 # Import RadarrAPI Class
@@ -15,11 +16,12 @@ from datetime import datetime as dt
 from datetime import timedelta as tdelta
 
 import logging
+import logging.handlers
 import sys
 import requests
 
 # Set Host URL and API-Key
-host_url = '<YOUR RADARR ADDRESS HERE>'
+host_url = 'https://<YOUR RADARR ADDRESS HERE>/'
 
 # You can find your API key in Settings > General.
 api_key = '<YOUR API KEY HERE>'
@@ -32,25 +34,35 @@ log_file = './RadarrStalledCleaner.log'
 
 
 
+def module_logger():
+    logger = logging.getLogger(__name__)
+    file_handler = logging.handlers.TimedRotatingFileHandler(filename=log_file, when='D', interval=1, backupCount=30)
+    formatter = logging.Formatter(u'%(asctime)s %(levelname)-8s %(message)s')
+    formatter.datefmt = '%Y-%m-%d %H:%M:%S'
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    return logger
+
 def main(args):
 
-    logging.basicConfig(filename =  log_file,
-                        level =     logging.DEBUG,
-                        datefmt =   '%Y-%m-%d %H:%M:%S',
-                        format =    u'%(asctime)s %(levelname)-8s %(message)s'
-                        )
-        
+    # Logging
+    log = module_logger()
+    log.setLevel(logging.DEBUG)
+    
     # Instantiate RadarrAPI Object
     try:
         radarr = RadarrAPI(host_url, api_key)
     except requests.ConnectionError as e:
-        logging.warning('Unable to connect to server: %s', e.strerror)
+        log.fatal('Unable to connect to server: %s', e)
         return 1
     except requests.exceptions.SSLError as e:
-        logging.fatal('SSL error %s', e)
+        log.fatal('SSL error %s', e)
+        return 1
+    except requests.RequestException as e:
+        log.fatal('Unable to connect: %s', e)
         return 1
     except Exception as e:
-        logging.warning('Unhandled exception: %s', e)
+        log.fatal('Unhandled exception: %s', e)
         return 1
         
     queued_movies = []
@@ -58,21 +70,25 @@ def main(args):
     try:
         queued_movies = radarr.get_queue_details()
     except requests.ConnectionError as e:
-        logging.fatal('Unable to connect to server: %s', e.strerror)
+        log.fatal('Unable to connect to server (Is the API key correct?): %s', e)
         return 1
     except requests.exceptions.SSLError as e:
-        logging.fatal('SSL error %s', e)
+        log.fatal('SSL error %s', e)
+        return 1
+    except requests.RequestException as e:
+        log.fatal('Unable to connect: %s', e)
         return 1
     except Exception as e:
-        logging.fatal('Unhandled exception: %s', e)
+        log.fatal('Unhandled exception: %s', e)
         return 1
-        
-        
+    
+    log.debug("Connected.")
+
     for movie_download in queued_movies:
 
         # Ignore movie if it is not being downloaded.
         if movie_download['status'] != 'downloading':
-            logging.info('Skipping "%s" - Status "%s" is not a downloading status.',
+            log.info('Skipping "%s" - Status "%s" is not a downloading status.',
                          movie_download['title'], movie_download['status'])
             continue
 
@@ -81,7 +97,7 @@ def main(args):
 
         if len(grab_events) <= 0:
             # log error
-            logging.error('Movie "%s" has no history of being grabbed.', movie_download['title'])
+            log.error('Movie "%s" has no history of being grabbed.', movie_download['title'])
             continue
 
         # Sort by grab date.
@@ -91,15 +107,15 @@ def main(args):
         # Debug print
         for evt in grab_events:
             time_delta = dt.now() - dt.strptime(evt['date'], '%Y-%m-%dT%H:%M:%SZ')
-            logging.debug('%s --- %s --- %s', evt['date'], movie_download['title'], time_delta)
+            log.debug('%s --- %s --- %s', evt['date'], movie_download['title'], time_delta)
         
         # Get time elapsed from last grab.
         time_elapsed = dt.now() - dt.strptime(last_grab_event['date'], '%Y-%m-%dT%H:%M:%SZ')
 
         if time_elapsed > time_limit:
-            logging.info('Removing stale movie download: %s', movie_download['title'] )
+            log.info('Removing stale movie download: %s', movie_download['title'] )
             
-            logging.debug('Removing stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
+            log.debug('Removing stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
                            movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
             
 
@@ -107,15 +123,15 @@ def main(args):
             try:
                 resp = radarr.del_queue(movie_download['id'],True,True)
             except BaseException as e:
-                logging.critical('Error when removing from queue %s', e)
+                log.critical('Error when removing from queue: %s', e)
                 continue
-            if resp != 200:
-                
-                logging.error('Error removing stale movie "%s"', movie_download['title'])
-                logging.debug('Error: %s', resp)
+            
+            if resp.status_code != 200:    
+                log.error('Error removing stale movie: "%s"', movie_download['title'])
+                log.debug('Error: %s', resp)
             else:
-                logging.info('Removed stale movie download: ', movie_download['title'] )           
-                logging.debug('Removed stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
+                log.info('Removed stale movie download: ', movie_download['title'] )           
+                log.debug('Removed stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
                            movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
 
 
