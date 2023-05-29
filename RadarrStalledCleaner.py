@@ -19,6 +19,7 @@ import logging
 import logging.handlers
 import sys
 import requests
+import os
 
 # Set Host URL and API-Key
 host_url = 'https://<YOUR RADARR ADDRESS HERE>/'
@@ -27,27 +28,45 @@ host_url = 'https://<YOUR RADARR ADDRESS HERE>/'
 api_key = '<YOUR API KEY HERE>'
 
 # How long should the release be in the queue, before it gets replaced.
-time_limit = tdelta(hours=0, days=1)
+time_limit = tdelta(hours=0, days=1,minutes=0,weeks=0)
+
 
 # Logging
-log_file = './RadarrStalledCleaner.log'
-
+# Log file directory.
+log_file = './logs/RadarrStalledCleaner.log'
+# Logging level.
+log_level = logging.INFO
 
 
 def module_logger():
+    
+    # Try to create log directory.
+    try:
+        if not os.path.exists(log_file):
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    except:
+        pass
+    
     logger = logging.getLogger(__name__)
-    file_handler = logging.handlers.TimedRotatingFileHandler(filename=log_file, when='D', interval=1, backupCount=30)
+    handler = logging.NullHandler()
+    
+    try:
+        handler = logging.handlers.TimedRotatingFileHandler(filename=log_file, when='D', interval=1, backupCount=30)
+    except Exception as e:
+        print("Unable to create log file. Continuing with logging to stderr.\n", e)
+        handler = logging.StreamHandler()
+        
     formatter = logging.Formatter(u'%(asctime)s %(levelname)-8s %(message)s')
     formatter.datefmt = '%Y-%m-%d %H:%M:%S'
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
     return logger
 
 def main(args):
 
     # Logging
     log = module_logger()
-    log.setLevel(logging.DEBUG)
+    log.setLevel(log_level)
     
     # Instantiate RadarrAPI Object
     try:
@@ -62,7 +81,7 @@ def main(args):
         log.fatal('Unable to connect: %s', e)
         return 1
     except Exception as e:
-        log.fatal('Unhandled exception: %s', e)
+        log.fatal('Unhandled exception: %s', e, exc_info=1)
         return 1
         
     queued_movies = []
@@ -79,7 +98,7 @@ def main(args):
         log.fatal('Unable to connect: %s', e)
         return 1
     except Exception as e:
-        log.fatal('Unhandled exception: %s', e)
+        log.fatal('Unhandled exception: %s', e, exc_info=1)
         return 1
     
     log.debug("Connected.")
@@ -122,7 +141,7 @@ def main(args):
             resp = requests.Response()
             try:
                 resp = radarr.del_queue(movie_download['id'],True,True)
-            except BaseException as e:
+            except Exception as e:
                 log.critical('Error when removing from queue: %s', e)
                 continue
             
