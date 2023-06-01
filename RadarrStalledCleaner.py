@@ -20,22 +20,33 @@ import logging.handlers
 import sys
 import requests
 import os
-
-# Set Host URL and API-Key
-host_url = 'https://<YOUR RADARR ADDRESS HERE>/'
-
-# You can find your API key in Settings > General.
-api_key = '<YOUR API KEY HERE>'
+import configparser
 
 # How long should the release be in the queue, before it gets replaced.
-time_limit = tdelta(hours=0, days=1,minutes=0,weeks=0)
+time_limit = tdelta(hours=0, days=1, minutes=0, weeks=0)
 
-
-# Logging
-# Log file directory.
-log_file = './logs/RadarrStalledCleaner.log'
-# Logging level.
-log_level = logging.INFO
+# Read config
+try:
+    config = configparser.ConfigParser()
+    res = config.read('./config.ini')
+    
+    # Set config values
+    host_url = config['radarr']['host_url']
+    urlbase = config['radarr']['url_base']
+    api_key = config['radarr']['api_key']
+    log_level = config['radarr']['log_level'].upper()
+    log_file = config['radarr']['log_file']
+    
+    if urlbase != "": 
+        host_url = "{}{}".format(host_url,urlbase)
+    
+except configparser.Error as e:
+    print('Error: ', e, file=sys.stderr)
+    sys.exit(1)
+except KeyError as e:
+    print('Error: key not found -', e, file=sys.stderr)
+    sys.exit(1)
+    
 
 
 def module_logger():
@@ -45,6 +56,7 @@ def module_logger():
         if not os.path.exists(log_file):
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
     except:
+        # If we can't create the directory, the logging handler initialisation will handle it.
         pass
     
     logger = logging.getLogger(__name__)
@@ -53,29 +65,36 @@ def module_logger():
     try:
         handler = logging.handlers.TimedRotatingFileHandler(filename=log_file, when='D', interval=1, backupCount=30)
     except Exception as e:
-        print("Unable to create log file. Continuing with logging to stderr.\n", e)
+        print("Unable to create log file. Continuing with logging to stderr.\n", e, file=sys.stderr)
         handler = logging.StreamHandler()
         
     formatter = logging.Formatter(u'%(asctime)s %(levelname)-8s %(message)s')
     formatter.datefmt = '%Y-%m-%d %H:%M:%S'
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    
+    try:
+        logger.setLevel(logging.getLevelName(log_level))
+    except:
+        logger.setLevel(logging.NOTSET)
+        logger.warning('Invalid logging level "' + log_level + '". Using default level "' + logging.getLevelName(logger.getEffectiveLevel()) + '".')        
+        
     return logger
 
 def main(args):
 
     # Logging
     log = module_logger()
-    log.setLevel(log_level)
+    log.info('Started.')
     
     # Instantiate RadarrAPI Object
     try:
         radarr = RadarrAPI(host_url, api_key)
-    except requests.ConnectionError as e:
-        log.fatal('Unable to connect to server: %s', e)
-        return 1
     except requests.exceptions.SSLError as e:
         log.fatal('SSL error %s', e)
+        return 1
+    except requests.ConnectionError as e:
+        log.fatal('Unable to connect to server: %s', e)
         return 1
     except requests.RequestException as e:
         log.fatal('Unable to connect: %s', e)
@@ -88,11 +107,11 @@ def main(args):
     # Get all movies in download queue (Activity tab).
     try:
         queued_movies = radarr.get_queue_details()
-    except requests.ConnectionError as e:
-        log.fatal('Unable to connect to server (Is the API key correct?): %s', e)
-        return 1
     except requests.exceptions.SSLError as e:
         log.fatal('SSL error %s', e)
+        return 1
+    except requests.ConnectionError as e:
+        log.fatal('Unable to connect to server (Is the API key correct?): %s', e)
         return 1
     except requests.RequestException as e:
         log.fatal('Unable to connect: %s', e)
