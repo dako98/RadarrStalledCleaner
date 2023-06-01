@@ -1,2 +1,4 @@
 RadarrStalledCleaner/*
 RadarrStalledCleaner.log
+RadarrStalledCleaner.log.*
+logs/*
