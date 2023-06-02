@@ -2,3 +2,4 @@ RadarrStalledCleaner/*
 RadarrStalledCleaner.log
 RadarrStalledCleaner.log.*
 logs/*
+config.ini
