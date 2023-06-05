@@ -39,7 +39,16 @@ try:
     api_key = config['radarr']['api_key']
     log_level = config['radarr']['log_level'].upper()
     log_file = config['radarr']['log_file']
-    
+    blocklist_cleanup = config.getboolean('radarr','blocklist_cleanup')
+    if blocklist_cleanup:
+        days = 30
+        try:
+            days = int(config['radarr']['blocklist_cleanup_max_age_days'])
+        except ValueError as e:
+            print('Invalid value for blocklist max age in days. Using default '+str(days)+' days. ', e, file=sys.stderr)
+  
+        blocked_release_time_limit = tdelta(days=days)
+        
     if urlbase != "": 
         host_url = "{}{}".format(host_url,urlbase)
     
@@ -85,14 +94,54 @@ def module_logger() -> logging.Logger:
     return logger
 
 def blocklist_cleaner(radarr_api:RadarrAPI, log:logging.Logger):
-    blocked_releases = radarr_api.get_blocklist()
+    page = 1
+    page_size = 500
+    remaining_records = 1
+
     ids_to_unblock = []
-    for release in blocked_releases:
-        time_elapsed = dt.now() - dt.strptime(release['date'], '%Y-%m-%dT%H:%M:%SZ')
-        if time_elapsed >= blocked_release_time_limit:
-            ids_to_unblock.append(release['id'])
+
+    
+    while remaining_records > 0:
+        
+        try:
+            blocked_releases = radarr_api.get_blocklist(page=page,page_size=page_size, sort_key='date', sort_dir='ascending')
+            log.debug('Got {} total releases. Page size: {}. Current page: {}.', blocked_releases['totalRecords'],
+                      page_size, page)
+        except requests.Timeout:
+            # Maybe the request is too big. Try decreasing the page size.
+            if page_size > 0:
+                log.warn('Request timed out. Reducing page size from {} to {}.', page_size, page_size/2)
+                page_size/=2
+                continue
+            else:
+                # Page size can not be decreased any further. Aborting.
+                log.error('Request timed out. Can not reduce page size. (Current: {})', page_size)
+                return 1
+        
+        if page == 1:
+            # Get the total count of records the first time.
+            remaining_records = blocked_releases['totalRecords']
+            
+        
+        remaining_records -= page*page_size
+    
+        # Add ID if it should be unblocked.
+        for release in blocked_releases:
+            time_elapsed = dt.now() - dt.strptime(release['date'], '%Y-%m-%dT%H:%M:%SZ')
+            if time_elapsed >= blocked_release_time_limit:
+                ids_to_unblock.append(release['id'])
+                log.debug('Added blocklist ID: {}, blocked {} ago.', release['id'], time_elapsed)
+            else:
+                # The records are sorted by date. If this record has
+                # not reached the limit, the following ones also wouldn't.
+                log.debug('Skipping blocklist ID: {}, blocked {} ago. (Limit not reached. Skipping all other entries.)', release['id'], time_elapsed)
+                remaining_records = 0
+                break
+        
+        page+=1
 
 
+    # If there are records for unblocking, send the API call.
     if len(ids_to_unblock) > 0:
         resp = requests.Response()
         
@@ -210,7 +259,8 @@ def main(args):
                            movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
                 total_movies_removed+=1
 
-    blocklist_cleaner(radarr, log)
+    if blocklist_cleanup:
+        blocklist_cleaner(radarr, log)
 
     log.info("Summary:\
             Total movies in queue: {} \
