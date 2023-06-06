@@ -49,7 +49,7 @@ except KeyError as e:
     
 
 
-def module_logger():
+def module_logger() -> logging.Logger:
     
     # Try to create log directory.
     try:
@@ -91,7 +91,7 @@ def main(args):
     try:
         radarr = RadarrAPI(host_url, api_key)
     except requests.exceptions.SSLError as e:
-        log.fatal('SSL error %s', e)
+        log.fatal('SSL error: %s', e)
         return 1
     except requests.ConnectionError as e:
         log.fatal('Unable to connect to server: %s', e)
@@ -102,13 +102,13 @@ def main(args):
     except Exception as e:
         log.fatal('Unhandled exception: %s', e, exc_info=1)
         return 1
-        
+
     queued_movies = []
     # Get all movies in download queue (Activity tab).
     try:
         queued_movies = radarr.get_queue_details()
     except requests.exceptions.SSLError as e:
-        log.fatal('SSL error %s', e)
+        log.fatal('SSL error: %s', e)
         return 1
     except requests.ConnectionError as e:
         log.fatal('Unable to connect to server (Is the API key correct?): %s', e)
@@ -122,6 +122,12 @@ def main(args):
     
     log.debug("Connected.")
 
+    total_movies_in_queue = len(queued_movies)
+    total_downloading_movies = 0
+    total_movies_to_remove = 0
+
+    stalled_releases_ids = []
+    
     for movie_download in queued_movies:
 
         # Ignore movie if it is not being downloaded.
@@ -129,7 +135,9 @@ def main(args):
             log.info('Skipping "%s" - Status "%s" is not a downloading status.',
                          movie_download['title'], movie_download['status'])
             continue
-
+        
+        total_downloading_movies+=1
+        
         # Get when the movie was grabbed.
         grab_events = radarr.get_movie_history(movie_download['movieId'], 'grabbed')
 
@@ -151,27 +159,36 @@ def main(args):
         time_elapsed = dt.now() - dt.strptime(last_grab_event['date'], '%Y-%m-%dT%H:%M:%SZ')
 
         if time_elapsed > time_limit:
+            
+            total_movies_to_remove+=1
+            stalled_releases_ids.append(movie_download['id'])
             log.info('Removing stale movie download: %s', movie_download['title'] )
             
             log.debug('Removing stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
                            movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
             
 
-            resp = requests.Response()
-            try:
-                resp = radarr.del_queue(movie_download['id'],True,True)
-            except Exception as e:
-                log.critical('Error when removing from queue: %s', e)
-                continue
-            
-            if resp.status_code != 200:    
-                log.error('Error removing stale movie: "%s"', movie_download['title'])
-                log.debug('Error: %s', resp)
-            else:
-                log.info('Removed stale movie download: ', movie_download['title'] )           
-                log.debug('Removed stale movie title: %s (ID: %d), queue ID: %d, grab event id: %d: ',
-                           movie_download['title'], movie_download['movieId'], movie_download['id'], last_grab_event['id'])
+    resp = requests.Response()
+    try:
+        resp = radarr.del_queue_bulk(stalled_releases_ids,True,True)
+    except Exception as e:
+        log.critical('Error when bulk removing from queue: %s', ', '.join(str(x) for x in stalled_releases_ids))
+    
+    if resp.status_code != 200:    
+        log.error('Error bulk removing stale movies: "%s"', ', '.join(str(x) for x in stalled_releases_ids))
+        log.debug('Error: %s', resp)
+    else:
+        log.info('Bulk removed stale movies download: ', ', '.join(str(x) for x in stalled_releases_ids))
 
+
+    log.info("Summary:\
+            Total movies in queue: {} \
+            Total downloading: {} \
+            Total to remove: {} \
+            Total removed: {}",
+            total_movies_in_queue,
+            total_downloading_movies,
+            total_movies_to_remove)
 
 if __name__ == '__main__':
     main(sys.argv)
