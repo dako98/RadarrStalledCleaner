@@ -22,13 +22,17 @@ import requests
 import os
 import configparser
 
+SCRIPT_PATH = os.path.realpath(__file__)
+
 # How long should the release be in the queue, before it gets replaced.
 time_limit = tdelta(hours=0, days=1, minutes=0, weeks=0)
+
+CONFIG_FILE = os.path.realpath(os.path.dirname(SCRIPT_PATH)+'/config.ini')
 
 # Read config
 try:
     config = configparser.ConfigParser()
-    res = config.read('./config.ini')
+    res = config.read(CONFIG_FILE)
     
     # Set config values
     host_url = config['radarr']['host_url']
@@ -36,6 +40,11 @@ try:
     api_key = config['radarr']['api_key']
     log_level = config['radarr']['log_level'].upper()
     log_file = config['radarr']['log_file']
+    
+    if log_file.startswith('.'):
+        log_file = os.path.dirname(SCRIPT_PATH) + log_file[1:]
+    else:
+        log_file = os.path.realpath(log_file)
     
     if urlbase != "": 
         host_url = "{}{}".format(host_url,urlbase)
@@ -86,6 +95,7 @@ def main(args):
     # Logging
     log = module_logger()
     log.info('Started.')
+    log.debug('Script run path: %s', SCRIPT_PATH)
     
     # Instantiate RadarrAPI Object
     try:
