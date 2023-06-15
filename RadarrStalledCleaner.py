@@ -31,7 +31,7 @@ CONFIG_FILE = os.path.realpath(os.path.dirname(SCRIPT_PATH)+'/config.ini')
 
 # Read config
 try:
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(os.environ)
     res = config.read(CONFIG_FILE)
     
     # Set config values
