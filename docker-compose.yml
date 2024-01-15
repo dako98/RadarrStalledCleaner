@@ -8,3 +8,10 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    environment: 
+      - RADARR_URL=https://127.0.0.1:7878/
+      - RADARR_URL_BASE=
+      - RADARR_API_KEY=
+      - L_LEVEL=INFO
+      - LOG=./logs/RadarrStalledCleaner.log
+      - SCHEDULE=* * * * *
